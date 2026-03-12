@@ -21,8 +21,8 @@ func (app *BootstrapApp) setupRouter() (*gin.Engine, error) {
 	engine := gin.New()
 	engine.Use(gin.Recovery())
 
-	if len(app.config.Server.TrustedProxies) > 0 {
-		err := engine.SetTrustedProxies(app.config.Server.TrustedProxies)
+	if len(app.config.Auth.TrustedProxies) > 0 {
+		err := engine.SetTrustedProxies(app.config.Auth.TrustedProxies)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to set trusted proxies: %w", err)
@@ -71,7 +71,7 @@ func (app *BootstrapApp) setupRouter() (*gin.Engine, error) {
 		ForgotPasswordMessage: app.config.UI.ForgotPasswordMessage,
 		BackgroundImage:       app.config.UI.BackgroundImage,
 		OAuthAutoRedirect:     app.config.OAuth.AutoRedirect,
-		DisableUIWarnings:     app.config.DisableUIWarnings,
+		WarningsEnabled:       app.config.UI.WarningsEnabled,
 	}, apiRouter)
 
 	contextController.SetupRoutes()
@@ -86,6 +86,10 @@ func (app *BootstrapApp) setupRouter() (*gin.Engine, error) {
 
 	oauthController.SetupRoutes()
 
+	oidcController := controller.NewOIDCController(controller.OIDCControllerConfig{}, app.services.oidcService, apiRouter)
+
+	oidcController.SetupRoutes()
+
 	proxyController := controller.NewProxyController(controller.ProxyControllerConfig{
 		AppURL: app.config.AppURL,
 	}, apiRouter, app.services.accessControlService, app.services.authService)
@@ -99,8 +103,8 @@ func (app *BootstrapApp) setupRouter() (*gin.Engine, error) {
 	userController.SetupRoutes()
 
 	resourcesController := controller.NewResourcesController(controller.ResourcesControllerConfig{
-		ResourcesDir:      app.config.ResourcesDir,
-		ResourcesDisabled: app.config.DisableResources,
+		Path:    app.config.Resources.Path,
+		Enabled: app.config.Resources.Enabled,
 	}, &engine.RouterGroup)
 
 	resourcesController.SetupRoutes()
@@ -108,6 +112,10 @@ func (app *BootstrapApp) setupRouter() (*gin.Engine, error) {
 	healthController := controller.NewHealthController(apiRouter)
 
 	healthController.SetupRoutes()
+
+	wellknownController := controller.NewWellKnownController(controller.WellKnownControllerConfig{}, app.services.oidcService, engine)
+
+	wellknownController.SetupRoutes()
 
 	return engine, nil
 }

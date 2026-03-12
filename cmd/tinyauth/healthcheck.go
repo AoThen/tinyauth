@@ -28,14 +28,24 @@ func healthcheckCmd() *cli.Command {
 		Run: func(args []string) error {
 			tlog.NewSimpleLogger().Init()
 
-			appUrl := os.Getenv("TINYAUTH_APPURL")
+			srvAddr := os.Getenv("TINYAUTH_SERVER_ADDRESS")
+			if srvAddr == "" {
+				srvAddr = "127.0.0.1"
+			}
+
+			srvPort := os.Getenv("TINYAUTH_SERVER_PORT")
+			if srvPort == "" {
+				srvPort = "3000"
+			}
+
+			appUrl := fmt.Sprintf("http://%s:%s", srvAddr, srvPort)
 
 			if len(args) > 0 {
 				appUrl = args[0]
 			}
 
 			if appUrl == "" {
-				return errors.New("TINYAUTH_APPURL is not set and no argument was provided")
+				return errors.New("Could not determine app URL")
 			}
 
 			tlog.App.Info().Str("app_url", appUrl).Msg("Performing health check")

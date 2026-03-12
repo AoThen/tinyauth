@@ -12,56 +12,8 @@ import (
 	"github.com/traefik/paerser/cli"
 )
 
-func NewTinyauthCmdConfiguration() *config.Config {
-	return &config.Config{
-		ResourcesDir: "./resources",
-		DatabasePath: "./tinyauth.db",
-		Server: config.ServerConfig{
-			Port:    3000,
-			Address: "0.0.0.0",
-		},
-		Auth: config.AuthConfig{
-			SessionExpiry:      86400, // 1 day
-			SessionMaxLifetime: 0,     // disabled
-			LoginTimeout:       300,   // 5 minutes
-			LoginMaxRetries:    3,
-		},
-		UI: config.UIConfig{
-			Title:                 "Tinyauth",
-			ForgotPasswordMessage: "You can change your password by changing the configuration.",
-			BackgroundImage:       "/background.jpg",
-		},
-		Ldap: config.LdapConfig{
-			Insecure:      false,
-			SearchFilter:  "(uid=%s)",
-			GroupCacheTTL: 900, // 15 minutes
-		},
-		Log: config.LogConfig{
-			Level: "info",
-			Json:  false,
-			Streams: config.LogStreams{
-				HTTP: config.LogStreamConfig{
-					Enabled: true,
-					Level:   "",
-				},
-				App: config.LogStreamConfig{
-					Enabled: true,
-					Level:   "",
-				},
-				Audit: config.LogStreamConfig{
-					Enabled: false,
-					Level:   "",
-				},
-			},
-		},
-		Experimental: config.ExperimentalConfig{
-			ConfigFile: "",
-		},
-	}
-}
-
 func main() {
-	tConfig := NewTinyauthCmdConfiguration()
+	tConfig := config.NewDefaultConfiguration()
 
 	loaders := []cli.ResourceLoader{
 		&loaders.FileLoader{},
@@ -71,12 +23,27 @@ func main() {
 
 	cmdTinyauth := &cli.Command{
 		Name:          "tinyauth",
-		Description:   "The simplest way to protect your apps with a login screen.",
+		Description:   "The simplest way to protect your apps with a login screen",
 		Configuration: tConfig,
 		Resources:     loaders,
 		Run: func(_ []string) error {
 			return runCmd(*tConfig)
 		},
+	}
+
+	cmdUser := &cli.Command{
+		Name:        "user",
+		Description: "Manage Tinyauth users",
+	}
+
+	cmdTotp := &cli.Command{
+		Name:        "totp",
+		Description: "Manage Tinyauth TOTP users",
+	}
+
+	cmdOidc := &cli.Command{
+		Name:        "oidc",
+		Description: "Manage Tinyauth OIDC clients",
 	}
 
 	err := cmdTinyauth.AddCommand(versionCmd())
@@ -85,7 +52,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to add version command")
 	}
 
-	err = cmdTinyauth.AddCommand(verifyUserCmd())
+	err = cmdUser.AddCommand(verifyUserCmd())
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to add verify command")
@@ -97,16 +64,40 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to add healthcheck command")
 	}
 
-	err = cmdTinyauth.AddCommand(generateTotpCmd())
+	err = cmdTotp.AddCommand(generateTotpCmd())
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to add generate command")
 	}
 
-	err = cmdTinyauth.AddCommand(createUserCmd())
+	err = cmdUser.AddCommand(createUserCmd())
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to add create command")
+	}
+
+	err = cmdOidc.AddCommand(createOidcClientCmd())
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to add create command")
+	}
+
+	err = cmdTinyauth.AddCommand(cmdUser)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to add user command")
+	}
+
+	err = cmdTinyauth.AddCommand(cmdTotp)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to add totp command")
+	}
+
+	err = cmdTinyauth.AddCommand(cmdOidc)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to add oidc command")
 	}
 
 	err = cli.Execute(cmdTinyauth)

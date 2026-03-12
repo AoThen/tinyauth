@@ -12,6 +12,7 @@ type Services struct {
 	dockerService        *service.DockerService
 	ldapService          *service.LdapService
 	oauthBrokerService   *service.OAuthBrokerService
+	oidcService          *service.OIDCService
 }
 
 func (app *BootstrapApp) initServices(queries *repository.Queries) (Services, error) {
@@ -30,11 +31,12 @@ func (app *BootstrapApp) initServices(queries *repository.Queries) (Services, er
 
 	err := ldapService.Init()
 
-	if err == nil {
-		services.ldapService = ldapService
-	} else {
-		tlog.App.Warn().Err(err).Msg("Failed to initialize LDAP service, continuing without it")
+	if err != nil {
+		tlog.App.Warn().Err(err).Msg("Failed to setup LDAP service, starting without it")
+		ldapService.Unconfigure()
 	}
+
+	services.ldapService = ldapService
 
 	dockerService := service.NewDockerService()
 
@@ -87,6 +89,22 @@ func (app *BootstrapApp) initServices(queries *repository.Queries) (Services, er
 	}
 
 	services.oauthBrokerService = oauthBrokerService
+
+	oidcService := service.NewOIDCService(service.OIDCServiceConfig{
+		Clients:        app.config.OIDC.Clients,
+		PrivateKeyPath: app.config.OIDC.PrivateKeyPath,
+		PublicKeyPath:  app.config.OIDC.PublicKeyPath,
+		Issuer:         app.config.AppURL,
+		SessionExpiry:  app.config.Auth.SessionExpiry,
+	}, queries)
+
+	err = oidcService.Init()
+
+	if err != nil {
+		return Services{}, err
+	}
+
+	services.oidcService = oidcService
 
 	return services, nil
 }

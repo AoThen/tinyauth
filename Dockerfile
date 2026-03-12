@@ -1,5 +1,5 @@
 # Site builder
-FROM oven/bun:1.3.6-alpine AS frontend-builder
+FROM oven/bun:1.3.10-alpine AS frontend-builder
 
 WORKDIR /frontend
 
@@ -57,9 +57,9 @@ EXPOSE 3000
 
 VOLUME ["/data"]
 
-ENV TINYAUTH_DATABASEPATH=/data/tinyauth.db
+ENV TINYAUTH_DATABASE_PATH=/data/tinyauth.db
 
-ENV TINYAUTH_RESOURCESDIR=/data/resources
+ENV TINYAUTH_RESOURCES_PATH=/data/resources
 
 ENV PATH=$PATH:/tinyauth
 

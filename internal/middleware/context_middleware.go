@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -12,6 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+var OIDCIgnorePaths = []string{"/api/oidc/token", "/api/oidc/userinfo"}
 
 type ContextMiddlewareConfig struct {
 	CookieDomain string
@@ -37,6 +39,13 @@ func (m *ContextMiddleware) Init() error {
 
 func (m *ContextMiddleware) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// There is no point in trying to get credentials if it's an OIDC endpoint
+		path := c.Request.URL.Path
+		if slices.Contains(OIDCIgnorePaths, strings.TrimSuffix(path, "/")) {
+			c.Next()
+			return
+		}
+
 		cookie, err := m.auth.GetSessionCookie(c)
 
 		if err != nil {
@@ -173,13 +182,17 @@ func (m *ContextMiddleware) Middleware() gin.HandlerFunc {
 
 			user := m.auth.GetLocalUser(basic.Username)
 
+			if user.TotpSecret != "" {
+				tlog.App.Debug().Msg("User with TOTP not allowed to login via basic auth")
+				return
+			}
+
 			c.Set("context", &config.UserContext{
 				Username:    user.Username,
 				Name:        utils.Capitalize(user.Username),
-				Email:       fmt.Sprintf("%s@%s", strings.ToLower(user.Username), m.config.CookieDomain),
+				Email:       utils.CompileUserEmail(user.Username, m.config.CookieDomain),
 				Provider:    "local",
 				IsLoggedIn:  true,
-				TotpEnabled: user.TotpSecret != "",
 				IsBasicAuth: true,
 			})
 			c.Next()
@@ -198,7 +211,7 @@ func (m *ContextMiddleware) Middleware() gin.HandlerFunc {
 			c.Set("context", &config.UserContext{
 				Username:    basic.Username,
 				Name:        utils.Capitalize(basic.Username),
-				Email:       fmt.Sprintf("%s@%s", strings.ToLower(basic.Username), m.config.CookieDomain),
+				Email:       utils.CompileUserEmail(basic.Username, m.config.CookieDomain),
 				Provider:    "ldap",
 				IsLoggedIn:  true,
 				LdapGroups:  strings.Join(ldapUser.Groups, ","),

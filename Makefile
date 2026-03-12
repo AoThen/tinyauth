@@ -10,13 +10,17 @@ BUILD_TIMESTAMP := $(shell date '+%Y-%m-%dT%H:%M:%S')
 BIN_NAME := tinyauth-$(GOARCH)
 
 # Development vars
-DEV_COMPOSE := $(shell test -f "docker-compose.test.yml" && echo "docker-compose.test.yml" || echo "docker-compose.yml" )
+DEV_COMPOSE := $(shell test -f "docker-compose.test.yml" && echo "docker-compose.test.yml" || echo "docker-compose.dev.yml" )
 PROD_COMPOSE := $(shell test -f "docker-compose.test.prod.yml" && echo "docker-compose.test.prod.yml" || echo "docker-compose.example.yml" )
 
 # Deps
 deps:
 	bun install --cwd frontend
 	go mod download
+
+# Clean data
+clean-data:
+	rm -rf data/
 
 # Clean web UI build
 clean-webui:
@@ -56,14 +60,26 @@ test:
 	go test -v ./...
 
 # Development
-develop:
-	docker compose -f $(DEV_COMPOSE) up --force-recreate --pull=always --remove-orphans
+dev:
+	docker compose -f $(DEV_COMPOSE) up --force-recreate --pull=always --remove-orphans --build
+
+# Development - Infisical
+dev-infisical:
+	infisical run --env=dev -- docker compose -f $(DEV_COMPOSE) up --force-recreate --pull=always --remove-orphans --build
 
 # Production
 prod:
 	docker compose -f $(PROD_COMPOSE) up --force-recreate --pull=always --remove-orphans
 
+# Production - Infisical
+prod-infisical:
+	infisical run --env=dev -- docker compose -f $(PROD_COMPOSE) up --force-recreate --pull=always --remove-orphans
+
 # SQL
 .PHONY: sql
 sql:
 	sqlc generate
+
+# Go gen
+generate:
+	go run ./gen
